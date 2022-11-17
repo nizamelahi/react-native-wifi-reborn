@@ -429,7 +429,7 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
             promise.reject(ConnectErrorCodes.unableToConnect.toString(), String.format("Failed to reconnect with %s", SSID));
             return;
         }
-        if (!pollForValidSSID(2, SSID)) {
+        if (!pollForValidSSID(4, SSID)) {
             promise.reject(ConnectErrorCodes.unableToConnect.toString(), String.format("Failed to connect with %s", SSID));
             return;
         }
@@ -460,7 +460,7 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
                         super.onAvailable(network);
                         DisconnectCallbackHolder.getInstance().bindProcessToNetwork(network);
                         connectivityManager.setNetworkPreference(ConnectivityManager.DEFAULT_NETWORK_PREFERENCE);
-                        if (!pollForValidSSID(3, SSID)) {
+                        if (!pollForValidSSID(4, SSID)) {
                             promise.reject(ConnectErrorCodes.android10ImmediatelyDroppedConnection.toString(), "Firmware bugs on OnePlus prevent it from connecting on some firmware versions.");
                             return;
                         }

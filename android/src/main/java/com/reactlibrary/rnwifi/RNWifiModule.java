@@ -18,8 +18,9 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSpecifier;
-import android.os.Build;
+import android.util.Log;
 import android.provider.Settings;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,7 +34,9 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.reactlibrary.rnwifi.errors.ConnectErrorCodes;
 import com.reactlibrary.rnwifi.errors.DisconnectErrorCodes;
+import com.reactlibrary.rnwifi.errors.ForceWifiUsageErrorCodes;
 import com.reactlibrary.rnwifi.errors.GetCurrentWifiSSIDErrorCodes;
+import com.reactlibrary.rnwifi.errors.IsEnabledErrorCodes;
 import com.reactlibrary.rnwifi.errors.IsRemoveWifiNetworkErrorCodes;
 import com.reactlibrary.rnwifi.errors.LoadWifiListErrorCodes;
 import com.reactlibrary.rnwifi.receivers.WifiScanResultReceiver;
@@ -51,6 +54,7 @@ import java.util.List;
 public class RNWifiModule extends ReactContextBaseJavaModule {
     private final WifiManager wifi;
     private final ReactApplicationContext context;
+    private static String TAG = "RNWifiModule";
 
     RNWifiModule(ReactApplicationContext context) {
         super(context);
@@ -186,7 +190,22 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void setEnabled(final boolean enabled) {
-        wifi.setWifiEnabled(enabled);
+        if (isAndroidTenOrLater()) {
+            openWifiSettings();
+        } else {
+            wifi.setWifiEnabled(enabled);
+        }
+    }
+
+    /**
+     * Use this to open a wifi settings panel.
+     * For Android Q and above.
+     */
+    @ReactMethod
+    public void openWifiSettings() {
+        Intent intent = new Intent(Settings.Panel.ACTION_WIFI);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        this.context.startActivity(intent);
     }
 
     /**
@@ -381,13 +400,19 @@ public class RNWifiModule extends ReactContextBaseJavaModule {
      */
     @ReactMethod
     public void reScanAndLoadWifiList(final Promise promise) {
-        if(!assertLocationPermissionGranted(promise)) {
+        if (!assertLocationPermissionGranted(promise)) {
             return;
         }
 
-        final WifiScanResultReceiver wifiScanResultReceiver = new WifiScanResultReceiver(wifi, promise);
-        getReactApplicationContext().registerReceiver(wifiScanResultReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-        wifi.startScan();
+        boolean wifiStartScan = wifi.startScan();
+        Log.d(TAG, "wifi start scan: " + wifiStartScan);
+        if (wifiStartScan == true) {
+          final WifiScanResultReceiver wifiScanResultReceiver = new WifiScanResultReceiver(wifi, promise);
+          getReactApplicationContext().registerReceiver(wifiScanResultReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        } else {
+            Log.d(TAG, "Wifi scan rejected");
+            promise.resolve("Starting Android 9, it's only allowed to scan 4 times per 2 minuts in a foreground app.");
+        }
     }
 
     private void connectToWifiDirectly(@NonNull final String SSID, @NonNull final String password, final boolean isHidden, final Promise promise) {
